@@ -42,3 +42,4 @@ VFD communications
    }
 
 ```
+the actual modbus address is what is above -1. That is what goes over the wire or ModbusTestPro would use in raw address mode. Note that libmbus may be different.

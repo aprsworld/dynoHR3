@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include <modbus.h>
 #include "pmd.h"
@@ -50,6 +51,9 @@ modbus_t *mb;
 /* USB DAQ globals */
 libusb_device_handle *udev = NULL;
 Calibration_AIN table_AIN[NGAINS_USB1608FS][NCHAN_USB1608FS];
+/* output file globals */
+FILE *fp_raw;
+FILE *fp_stats;
 
 #define CHANNEL_MODE_ANALOG                0
 #define CHANNEL_MODE_FREQUENCY_FROM_ANALOG 1
@@ -68,7 +72,7 @@ Calibration_AIN table_AIN[NGAINS_USB1608FS][NCHAN_USB1608FS];
 /* dyno sweep specifications */
 #define DYNO_RPM_START	50	/* RPM */
 #define DYNO_RPM_END	400	/* RPM to end at */
-#define DYNO_RPM_STEP	10	/* RPM step size */
+#define DYNO_RPM_STEP	100	/* RPM step size */
 #define	DYNO_RPM_WAIT	2	/* seconds to wait for dyno to reach RPM */
 
 
@@ -273,6 +277,7 @@ int daq_acquire(void) {
 	uint8_t gainArray[NCHAN_USB1608FS];
 	uint16_t data[1000*NCHAN_USB1608FS*2];
 	int options;
+	struct timeval tv;
 
 	usbAInStop_USB1608FS(udev);
 
@@ -290,6 +295,10 @@ int daq_acquire(void) {
 	options = AIN_EXECUTION;
 	//options = AIN_EXECUTION | AIN_DEBUG_MODE;
 
+
+	/* get unix timestamp for this measurement */
+	gettimeofday(&tv, NULL);
+
 	/* start the scan */
 	float freq = DAQ_SAMPLE_FREQ;
 	fprintf(stderr,"# starting analog scan (frequency=%.f count=%d)\n",freq,DAQ_SAMPLE_COUNT);
@@ -298,6 +307,8 @@ int daq_acquire(void) {
 	fprintf(stderr,"# DAQ scan complete (actual frequency = %f)\n", freq);
 
 	for ( nSample=0 ; nSample < DAQ_SAMPLE_COUNT ; nSample++ ) {
+		/* timestamp is the beginning of each measurement */
+		fprintf(fp_raw,"%ld",tv.tv_sec);
 		for ( int nChannel=0; nChannel < NCHAN_USB1608FS ; nChannel++ ) {
 			uint16_t dat;	/* raw 16 bit value from ADC */
 			int16_t sdat;	/* scaled using DAQ calibration and gain and sign extended */
@@ -330,6 +341,10 @@ int daq_acquire(void) {
 		
 			double volts=volts_USB1608FS(ch[nChannel].gain, sdat);
 
+
+			/* write voltage to output file */
+			fprintf(fp_raw,",%.4f",volts);
+
 			ch[nChannel].nSamples++;
 			ch[nChannel].vSum += volts;
 			if ( volts < ch[nChannel].vMin ) {
@@ -358,9 +373,12 @@ int daq_acquire(void) {
 				}
 			}
 		}
+		/* terminate raw data line */
+		fprintf(fp_raw,"\n");
 	}
 	fprintf(stderr,"# sampleN, sensor value, raw data, scaled raw data, volts\n");
 
+	fprintf(fp_stats,"%ld",tv.tv_sec);
 	/* calculate statistics now that we are done */
 	fprintf(stderr,"# channel statistics:\n");
 	for ( i=0 ; i<NCHAN_USB1608FS ; i++ ) {
@@ -383,6 +401,19 @@ int daq_acquire(void) {
 int main (int argc, char **argv) {
 	int i;
 	int ret;
+	char filename_raw[1024];
+	char filename_stats[1024];
+	struct timeval tv;
+
+	if ( 2 != argc ) {
+		fprintf(stderr,"dynoHR3 outputFilenamePrefix\n");
+		exit(1);
+	}
+
+	gettimeofday(&tv, NULL);
+	sprintf(filename_raw,"%s_%ld_raw.csv",argv[1],tv.tv_sec);
+	sprintf(filename_stats,"%s_%ld_stats.csv",argv[1],tv.tv_sec);
+
 
 
 
@@ -439,6 +470,13 @@ int main (int argc, char **argv) {
 	sleep(5*DYNO_RPM_WAIT); 	/* ramp up to initial speed */
 
 
+	fprintf(stderr,"# creating output files:\n");
+	fprintf(stderr,"# %s   raw data log filename\n",filename_raw);
+	fprintf(stderr,"# %s stats data log filename\n",filename_stats);
+	fp_raw=fopen(filename_raw,"w");
+	fp_stats=fopen(filename_stats,"w");
+
+
 	for ( int rpm=DYNO_RPM_START ; rpm<=DYNO_RPM_END ; rpm+=DYNO_RPM_STEP ) {
 		/* start new measurement */
 		fprintf(stderr,"##################################################################################\n");
@@ -466,7 +504,9 @@ stop:
 	vfd_gs3_command_stop();
 
 	/* close output file */
-
+	fprintf(stderr,"# closing output files\n");
+	fclose(fp_raw);
+	fclose(fp_stats);
 
 
 

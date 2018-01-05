@@ -217,6 +217,7 @@ int vfd_gs3_set_rpm(int rpm) {
 	d = rpm * DYNO_CONFIG_HZ_PER_RPM;
 	/* VFD expects frequency in deciHz */
 	d *= 10.0;
+	d += 0.5; /* so we round */
 	value=(uint16_t) d;
 
 
@@ -308,7 +309,8 @@ int daq_acquire(void) {
 
 	for ( nSample=0 ; nSample < DAQ_SAMPLE_COUNT ; nSample++ ) {
 		/* timestamp is the beginning of each measurement */
-		fprintf(fp_raw,"%ld",tv.tv_sec);
+		fprintf(fp_raw,"%ld,%f",tv.tv_sec,freq);
+
 		for ( int nChannel=0; nChannel < NCHAN_USB1608FS ; nChannel++ ) {
 			uint16_t dat;	/* raw 16 bit value from ADC */
 			int16_t sdat;	/* scaled using DAQ calibration and gain and sign extended */
@@ -378,10 +380,16 @@ int daq_acquire(void) {
 	}
 	fprintf(stderr,"# sampleN, sensor value, raw data, scaled raw data, volts\n");
 
-	fprintf(fp_stats,"%ld",tv.tv_sec);
+	/* each line gets timestamp of measurement, actual sample frequency, nSamples */
+	fprintf(fp_stats,"%ld,%f,%d",tv.tv_sec,freq,ch[0].nSamples);
+
 	/* calculate statistics now that we are done */
 	fprintf(stderr,"# channel statistics:\n");
 	for ( i=0 ; i<NCHAN_USB1608FS ; i++ ) {
+		ch[i].vAvg=ch[i].vSum / ( (double) ch[i].nSamples);
+
+		fprintf(stderr,"#\t[%d] vMin=%0.4f vMax=%0.4f vAvg=%0.4f nSamples=%d\n",i,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nSamples);
+
 		if ( CHANNEL_MODE_FREQUENCY_FROM_ANALOG == ch[i].mode ) {
 			/* calculate frequency based on our gate time */
 			ch[i].frequency = ch[i].nFallingEdges / ( ch[i].nSamples / freq);
@@ -389,10 +397,11 @@ int daq_acquire(void) {
 			fprintf(stderr,"#\t[%d] %d frequency=%0.1f\n",i,ch[i].nFallingEdges,ch[i].frequency);
 		}
 
-		ch[i].vAvg=ch[i].vSum / ( (double) ch[i].nSamples);
+		/* channel, vMin, vMax, vAvg, nFallingEdges, frequency */
+		fprintf(fp_stats,", %d,%0.4f,%0.4f,%0.4f,%d,%0.1f",i,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nFallingEdges,ch[i].frequency);
 
-		fprintf(stderr,"#\t[%d] vMin=%0.4f vMax=%0.4f vAvg=%0.4f nSamples=%d\n",i,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nSamples);
 	}
+	fprintf(fp_stats,"\n");
 
 
 	return ch[0].nSamples;
@@ -495,7 +504,9 @@ int main (int argc, char **argv) {
 		daq_acquire();
 
 		/* send / save data */
-		fprintf(stderr,"# exporting data\n");
+		fprintf(stderr,"# flushing logged data\n");
+		fflush(fp_raw);
+		fflush(fp_stats);
 	}
 
 stop:

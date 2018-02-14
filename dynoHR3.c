@@ -196,6 +196,7 @@ int vfd_connect() {
 int vfd_gs3_set_automated_parameters() {
 //	uint16_t value = 0;
 
+	/* TODO: implement or remove stub */
 	/* Set P3.00 "source of operation" to 0x03 "RS-485 with keypad STOP enabled"*/
 	/* Set P4.00 "source of frequency command" to 0x05 "RS-485" */
 	/* what else is needed? */
@@ -207,6 +208,7 @@ int vfd_gs3_set_automated_parameters() {
 int vfd_gs3_clear_automated_parameters() {
 //	uint16_t value = 0;
 
+	/* TODO: implement or remove stub */
 	return 0;
 }
 
@@ -495,9 +497,7 @@ int main (int argc, char **argv) {
 
 	int rpm;
 
-//	/* step up */
-//	for ( rpm=DYNO_RPM_START ; rpm<=DYNO_RPM_END ; rpm+=DYNO_RPM_STEP ) {
-	/* step down */
+	/* step down. Need to spin DUT fast to establish field magnetism. Then we work down. Don't be scared. */
 	for ( rpm=DYNO_RPM_END ; rpm>=DYNO_RPM_START ; rpm-=DYNO_RPM_STEP ) {
 		/* start new measurement */
 		fprintf(stderr,"##################################################################################\n");
@@ -521,31 +521,6 @@ int main (int argc, char **argv) {
 		fflush(fp_stats);
 	}
 
-#if 0
-	/* step down */
-	for ( ; rpm>=DYNO_RPM_START ; rpm-=DYNO_RPM_STEP ) {
-		/* start new measurement */
-		fprintf(stderr,"##################################################################################\n");
-		init_channel_stats();
-
-		/* command dyno RPM */
-		fprintf(stderr,"# setting dyno RPM to %d\n",rpm);
-		vfd_gs3_set_rpm(rpm);
-
-		/* wait for dyno RPM to stabilize */
-		fprintf(stderr,"# delay to allow RPM to be reached\n");
-		sleep(DYNO_RPM_WAIT);
-
-		/* acquire data */
-		fprintf(stderr,"# acquiring data\n");
-		daq_acquire();
-
-		/* send / save data */
-		fprintf(stderr,"# flushing logged data\n");
-		fflush(fp_raw);
-		fflush(fp_stats);
-	}
-#endif
 
 stop:
 	/* stop the motor */

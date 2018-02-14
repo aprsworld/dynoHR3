@@ -1,5 +1,7 @@
 # HR3 Dyno
 
+Commands VFD to sweep RPM from high RPM to low RPM. Measure analog values using USB-1608FS DAQ at each step. Record raw and summarized data.
+
 ## Compiling
 
 

@@ -51,6 +51,9 @@ modbus_t *mb;
 /* USB DAQ globals */
 libusb_device_handle *udev = NULL;
 Calibration_AIN table_AIN[NGAINS_USB1608FS][NCHAN_USB1608FS];
+int commandedRPM=-1;
+
+
 /* output file globals */
 FILE *fp_raw;
 FILE *fp_stats;
@@ -71,8 +74,8 @@ FILE *fp_stats;
 
 /* dyno sweep specifications */
 #define DYNO_RPM_START	50	/* RPM */
-#define DYNO_RPM_END	400	/* RPM to end at */
-#define DYNO_RPM_STEP	100	/* RPM step size */
+#define DYNO_RPM_END	325	/* RPM to end at */
+#define DYNO_RPM_STEP	5	/* RPM step size */
 #define	DYNO_RPM_WAIT	2	/* seconds to wait for dyno to reach RPM */
 
 
@@ -114,7 +117,7 @@ void set_channels() {
 
 	/* rectifier DC current */
 	ch[1].mode=CHANNEL_MODE_ANALOG;
-	ch[1].m=1750.0;
+	ch[1].m=175.0;
 	ch[1].b=0.0;
 	ch[1].gain=BP_1_00V;
 
@@ -126,7 +129,7 @@ void set_channels() {
 
 	/* field DC current */
 	ch[3].mode=CHANNEL_MODE_ANALOG;
-	ch[3].m=1750.0;
+	ch[3].m=175.0;
 	ch[3].b=0.0;
 	ch[3].gain=BP_1_00V;
 
@@ -212,6 +215,7 @@ int vfd_gs3_set_rpm(int rpm) {
 	uint16_t value = 0;
 	double d;
 
+	commandedRPM=rpm;
 
 	/* output shaft has reduction, so we use a constant to get from motor Hz to output RPM */
 	d = rpm * DYNO_CONFIG_HZ_PER_RPM;
@@ -309,7 +313,7 @@ int daq_acquire(void) {
 
 	for ( nSample=0 ; nSample < DAQ_SAMPLE_COUNT ; nSample++ ) {
 		/* timestamp is the beginning of each measurement */
-		fprintf(fp_raw,"%ld,%f",tv.tv_sec,freq);
+		fprintf(fp_raw,"%ld,%f,%d",tv.tv_sec,freq,commandedRPM);
 
 		for ( int nChannel=0; nChannel < NCHAN_USB1608FS ; nChannel++ ) {
 			uint16_t dat;	/* raw 16 bit value from ADC */
@@ -381,7 +385,7 @@ int daq_acquire(void) {
 	fprintf(stderr,"# sampleN, sensor value, raw data, scaled raw data, volts\n");
 
 	/* each line gets timestamp of measurement, actual sample frequency, nSamples */
-	fprintf(fp_stats,"%ld,%f,%d",tv.tv_sec,freq,ch[0].nSamples);
+	fprintf(fp_stats,"%ld,%f,%d,%d",tv.tv_sec,freq,commandedRPM,ch[0].nSamples);
 
 	/* calculate statistics now that we are done */
 	fprintf(stderr,"# channel statistics:\n");
@@ -397,8 +401,10 @@ int daq_acquire(void) {
 			fprintf(stderr,"#\t[%d] %d frequency=%0.1f\n",i,ch[i].nFallingEdges,ch[i].frequency);
 		}
 
+		double scaled = ch[i].m * ch[i].vAvg + ch[i].b;
+
 		/* channel, vMin, vMax, vAvg, nFallingEdges, frequency */
-		fprintf(fp_stats,", %d,%0.4f,%0.4f,%0.4f,%d,%0.1f",i,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nFallingEdges,ch[i].frequency);
+		fprintf(fp_stats,", %d,%0.4f,%0.4f,%0.4f,%0.4f,%d,%0.1f",i,scaled,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nFallingEdges,ch[i].frequency);
 
 	}
 	fprintf(fp_stats,"\n");
@@ -474,9 +480,11 @@ int main (int argc, char **argv) {
 	sleep(1);
 
 	fprintf(stderr,"# commanding VFD to run\n");
-	vfd_gs3_set_rpm(DYNO_RPM_START);
+	vfd_gs3_set_rpm(180);
 	vfd_gs3_command_run();
-	sleep(5*DYNO_RPM_WAIT); 	/* ramp up to initial speed */
+	sleep(20); 	/* ramp up to initial speed */
+	vfd_gs3_set_rpm(DYNO_RPM_END);
+	sleep(15); 	/* ramp up to initial speed */
 
 
 	fprintf(stderr,"# creating output files:\n");
@@ -485,8 +493,12 @@ int main (int argc, char **argv) {
 	fp_raw=fopen(filename_raw,"w");
 	fp_stats=fopen(filename_stats,"w");
 
+	int rpm;
 
-	for ( int rpm=DYNO_RPM_START ; rpm<=DYNO_RPM_END ; rpm+=DYNO_RPM_STEP ) {
+//	/* step up */
+//	for ( rpm=DYNO_RPM_START ; rpm<=DYNO_RPM_END ; rpm+=DYNO_RPM_STEP ) {
+	/* step down */
+	for ( rpm=DYNO_RPM_END ; rpm>=DYNO_RPM_START ; rpm-=DYNO_RPM_STEP ) {
 		/* start new measurement */
 		fprintf(stderr,"##################################################################################\n");
 		init_channel_stats();
@@ -508,6 +520,32 @@ int main (int argc, char **argv) {
 		fflush(fp_raw);
 		fflush(fp_stats);
 	}
+
+#if 0
+	/* step down */
+	for ( ; rpm>=DYNO_RPM_START ; rpm-=DYNO_RPM_STEP ) {
+		/* start new measurement */
+		fprintf(stderr,"##################################################################################\n");
+		init_channel_stats();
+
+		/* command dyno RPM */
+		fprintf(stderr,"# setting dyno RPM to %d\n",rpm);
+		vfd_gs3_set_rpm(rpm);
+
+		/* wait for dyno RPM to stabilize */
+		fprintf(stderr,"# delay to allow RPM to be reached\n");
+		sleep(DYNO_RPM_WAIT);
+
+		/* acquire data */
+		fprintf(stderr,"# acquiring data\n");
+		daq_acquire();
+
+		/* send / save data */
+		fprintf(stderr,"# flushing logged data\n");
+		fflush(fp_raw);
+		fflush(fp_stats);
+	}
+#endif
 
 stop:
 	/* stop the motor */

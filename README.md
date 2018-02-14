@@ -4,7 +4,7 @@
 
 
 ```
-gcc -g -Wall -I. -o dynoHR3 dynoHR3.c -L. -lmccusb  -lm -L/usr/local/lib -lhidapi-libusb -lusb-1.0 `pkg-config --cflags --libs libmodbus`
+gcc -std=c99 -g -Wall -I. -o dynoHR3 dynoHR3.c -L. -lmccusb  -lm -L/usr/local/lib -lhidapi-libusb -lusb-1.0 `pkg-config --cflags --libs libmodbus`
 ```
 
 ## Libraries needed:

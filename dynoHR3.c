@@ -26,6 +26,8 @@ typedef struct {
 	int gain;	/* USB-1608FS gain setting for this ADC input */
 			/* PGA gain (10V, 5V, 2V, 1V) = { BP_10_00V, BP_5_00V, BP_2_00V, BP_1_00V) */
 
+	char name[256]; /* spreadsheet column name (should be short) */
+
 
 	int nSamples;
 
@@ -109,54 +111,112 @@ void init_channels(void) {
 void set_channels() {
 	/* configure our channels */
 	init_channels();
+
 	/* rectifier DC voltage */
 	ch[0].mode=CHANNEL_MODE_ANALOG;
 	ch[0].m=20.0;
 	ch[0].b=0.0;
 	ch[0].gain=BP_5_00V;
+	strcpy(ch[0].name,"Rectifier DC volts");
 
 	/* rectifier DC current */
 	ch[1].mode=CHANNEL_MODE_ANALOG;
 	ch[1].m=175.0;
 	ch[1].b=0.0;
 	ch[1].gain=BP_1_00V;
+	strcpy(ch[1].name,"Rectifier DC amps");
 
 	/* field DC voltage */
 	ch[2].mode=CHANNEL_MODE_ANALOG;
 	ch[2].m=20.0;
 	ch[2].b=0.0;
 	ch[2].gain=BP_5_00V;
+	strcpy(ch[2].name,"Field DC volts");
 
 	/* field DC current */
 	ch[3].mode=CHANNEL_MODE_ANALOG;
 	ch[3].m=175.0;
 	ch[3].b=0.0;
 	ch[3].gain=BP_1_00V;
+	strcpy(ch[3].name,"Field DC amps");
 
 	/* turbine output frequency */
 	ch[4].mode=CHANNEL_MODE_FREQUENCY_FROM_ANALOG;
 	ch[4].m=1.0;
 	ch[4].b=0.0;
 	ch[4].gain=BP_5_00V;
+	strcpy(ch[4].name,"Turbine Output Hz");
 
 	/* dyno shaft RPM */
 	ch[5].mode=CHANNEL_MODE_FREQUENCY_FROM_ANALOG;
 	ch[5].m=1.0;
 	ch[5].b=0.0;
 	ch[5].gain=BP_5_00V;
+	strcpy(ch[5].name,"Dyno Shaft RPM");
 
 	/* turbine temperature via IR thermocouple */
 	ch[6].mode=CHANNEL_MODE_ANALOG;
 	ch[6].m=100.0;
 	ch[6].b=0.0;
 	ch[6].gain=BP_2_00V;
+	strcpy(ch[6].name,"Turbine IR Temperature C");
 
 	/* strain gauge on dyno output shaft */
 	ch[7].mode=CHANNEL_MODE_ANALOG;
 	ch[7].m=1.0;
 	ch[7].b=0.0;
 	ch[7].gain=BP_5_00V;
+	strcpy(ch[7].name,"Dyno Strain unused");
 
+	/* print debugging list of channels */
+	fprintf(stderr,"# Channel configuration:\n");
+	for ( int i=0 ; i<NCHAN_USB1608FS ; i++ ) {
+		fprintf(stderr,"\tch[%d] mode=%d m=%f b=%f gain=%d name='%s'\n",
+			i,
+			ch[i].mode,
+			ch[i].m,
+			ch[i].b,
+			ch[i].gain,
+			ch[i].name
+		);
+	}
+
+	fprintf(stderr,"# Column labels for CSV stats file:\n");
+	fprintf(stderr,"\"timetamp (unix)\", \"sample frequency\", \"commanded RPM\", \"nSamples\"");
+//	fprintf(fp_stats,"%ld,%f,%d,%d",tv.tv_sec,freq,commandedRPM,ch[0].nSamples);
+	for ( int i=0 ; i<NCHAN_USB1608FS ; i++ ) {
+		//fprintf(fp_stats,", %d,%0.4f,%0.4f,%0.4f,%0.4f,%d,%0.1f",i,scaled,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nFallingEdges,ch[i].frequency);
+		fprintf(stderr,", \"ch[%d] marker\", \"%s (scaled)\", \"%s (vMin)\", \"%s (vMax)\", \"%s (vAvg)\", \"%s (nFallingEdges)\", \"%s (frequency)\"",
+			i,
+			ch[i].name,
+			ch[i].name,
+			ch[i].name,
+			ch[i].name,
+			ch[i].name,
+			ch[i].name
+		);
+	}
+	fprintf(stderr,"\n");
+
+	fprintf(stderr,"# Column numbers / labels for GNUPLOT 1-based numbering:\n");
+	int c=1;
+	fprintf(stderr,"[%d]\t\"timetamp (unix)\"\n",c++);
+	fprintf(stderr,"[%d]\t\"sample frequency\"\n",c++);
+	fprintf(stderr,"[%d]\t\"commanded RPM\"\n",c++);
+	fprintf(stderr,"[%d]\t\"nSamples\"\n",c++);
+
+//	fprintf(fp_stats,"%ld,%f,%d,%d",tv.tv_sec,freq,commandedRPM,ch[0].nSamples);
+	for ( int i=0 ; i<NCHAN_USB1608FS ; i++ ) {
+		//fprintf(fp_stats,", %d,%0.4f,%0.4f,%0.4f,%0.4f,%d,%0.1f",i,scaled,ch[i].vMin,ch[i].vMax,ch[i].vAvg,ch[i].nFallingEdges,ch[i].frequency);
+		fprintf(stderr,"[%d]\t\"ch[%d] marker\"\n",c++,i);
+		fprintf(stderr,"[%d]\t\"%s (scaled)\"\n",c++,ch[i].name);
+		fprintf(stderr,"[%d]\t\"%s (vMin)\"\n",c++,ch[i].name);
+		fprintf(stderr,"[%d]\t\"%s (vMax)\"\n",c++,ch[i].name);
+		fprintf(stderr,"[%d]\t\"%s (vAvg)\"\n",c++,ch[i].name);
+		fprintf(stderr,"[%d]\t\"%s (nFallingEdges)\"\n",c++,ch[i].name);
+		fprintf(stderr,"[%d]\t\"%s (frequency)\"\n",c++,ch[i].name);
+	}
+	fprintf(stderr,"\n");
 
 }
 
@@ -427,6 +487,7 @@ int main (int argc, char **argv) {
 		exit(1);
 	}
 
+	/* generate outfile files with prefix_unixtime_raw.csv and prefix_unixtime_stats.csv */
 	gettimeofday(&tv, NULL);
 	sprintf(filename_raw,"%s_%ld_raw.csv",argv[1],tv.tv_sec);
 	sprintf(filename_stats,"%s_%ld_stats.csv",argv[1],tv.tv_sec);

@@ -131,7 +131,7 @@ set x2label ""
 set x2label  font "" textcolor lt -1 norotate
 set xrange [ 50.0000 : 325.000 ] noreverse nowriteback
 set x2range [ * : * ] noreverse nowriteback
-set ylabel "Turbine AC Frequency (Hz)" 
+set ylabel "Rectifier DC Output Current (amps)" 
 set ylabel  font "" textcolor lt -1 rotate by -270
 set y2label "" 
 set y2label  font "" textcolor lt -1 rotate by -270
@@ -172,19 +172,14 @@ x = 0.0
 
 set linetype 1 lc rgb "black" lw 2 pt 11
 
-# set terminal qt 0 title t size 1280, 400 font "Sans,14"
-#set terminal png size 1280, 400 enhanced font "Sans,14"
-# set terminal png enhanced truecolor size 1280, 400 font "Helvetica,14"
 set terminal pngcairo size 1280,400 enhanced font 'Verdana,14' nocrop
-# set output 'output.png'
+# set output to whatever is specified by o variable
 set output o
 
 # set the title to our fixed string plus t variable set from command line
-set title "Turbine AC Output Frequency versus RPM"
-if ( exist("t") ) set title sprintf("Turbine AC Output Frequency versus RPM\n{/=20 %s}",t);
+set title "Turbine DC Output Current versus RPM"
+if ( exist("t") ) set title sprintf("Turbine Rectifier DC Output Current versus RPM\n{/=20 %s}",t);
 	
-
-## Last datafile plotted: "487_full_run_backwards_1515185429_stats.csv"
-#plot '../dataExample/487_full_run_backwards_1515185429_stats.csv' using 3:39 with linespoints 
-plot f using 3:39 with linespoints 
-#title "RPM versus Turbine Output Frequency (Hz)"
+# do the plot
+# flip the sign on the current
+plot f using 3:($13 * -1.0) with linespoints 

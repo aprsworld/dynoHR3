@@ -13,15 +13,6 @@ if ( ! isset($_SERVER['argv'][2]) ) {
 }
 $dut_serial=$_SERVER['argv'][2];
 
-/* create serial number specific output directory */
-$outputDirectory = sprintf("%s/%s",$outputDirectory,$dut_serial);
-if ( ! is_dir($outputDirectory) ) { 
-	printf("# creating %s\n",$outputDirectory);
-
-	if ( ! mkdir($outputDirectory,0755,true) ) {
-		die("# error creating output directory. Aborting...\n");
-	}
-}
 
 
 $gnuplotFiles=array();
@@ -44,6 +35,16 @@ $dataFile_parts=explode('_',$dataFile);
 $dyno_run_start_time=$dataFile_parts[count($dataFile_parts)-2];
 
 $dyno_run_start_date=gmdate("Y-m-d H:i:s e",$dyno_run_start_time);
+
+/* create serial number and dyno run specific specific output directory */
+$outputDirectory = sprintf("%s/%s/%s",$outputDirectory,$dut_serial,$dyno_run_start_time);
+if ( ! is_dir($outputDirectory) ) { 
+	printf("# creating %s\n",$outputDirectory);
+
+	if ( ! mkdir($outputDirectory,0755,true) ) {
+		die("# error creating output directory. Aborting...\n");
+	}
+}
 
 printf("# dyno run start time = '%s' (from timestamp in filename)\n",$dyno_run_start_time);
 printf("# dyno run start date = '%s'\n",$dyno_run_start_date);
@@ -74,7 +75,6 @@ foreach ( $gnuplotFiles as &$gnuplotFile ) {
 
 }
 
-print_r($gnuplotOutputFiles);
 
 /* create report HTML file */
 $reportHTMLFilename = sprintf("%s/report_%s_%s.html",$outputDirectory,$dut_serial,$dyno_run_start_time);
@@ -95,6 +95,7 @@ fprintf($fp,"<p>This report was automatically generated on <i>%s</i> with the fo
 fprintf($fp,"<p>The source code for this report generator and the dyno control software can be found at: <a href=\"https://github.com/aprsworld/dynoHR3/\">https://github.com/aprsworld/dynoHR3/</a></p>\n");
 
 fprintf($fp,"<h2>Electrical Configuration</h2>\n");
+/* copy default electrical connection schematic to output directory */
 copy('res/images/hr3_dut_simplified_electrical_release_20180223.png',$outputDirectory . '/hr3_dut_simplified_electrical_release_20180223.png');
 fprintf($fp,"<img src=\"hr3_dut_simplified_electrical_release_20180223.png\" alt=\"Dyno Connection Schematic\" style=\"width: 1280px; height: auto; padding: 20px;\"/>\n");
 
@@ -111,6 +112,7 @@ copy($dataFile,$outputDirectory . '/' . basename($dataFile));
 
 $dataFileRaw = str_replace('_stats.csv','_raw.csv',$dataFile);
 printf("# copying raw datafile='%s' to report directory\n",$dataFileRaw);
+copy($dataFileRaw,$outputDirectory . '/' . basename($dataFileRaw));
 
 fprintf($fp,"<ul>\n");
 
@@ -145,8 +147,6 @@ sort($dutPhotos);
 if ( 0 == count($dutPhotos) ) {
 	fprintf($fp,"<p>No photos found.</p>\n");
 } else {
-	print_r($dutPhotos);
-
 	fprintf($fp,"<ul>\n");
 	for ( $i=0 ; $i<count($dutPhotos) ; $i++ ) {
 		fprintf($fp,"<li><a href=\"%s\">%s</a> (%s Kb)<br />\n",$dutPhotos[$i],basename($dutPhotos[$i]),number_format(filesize($outputDirectory . '/' . $dutPhotos[$i])/1024));

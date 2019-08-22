@@ -19,4 +19,15 @@ sudo apt-get install libudev-dev libusb-1.0-0-dev libfox-1.6-dev
 
 https://github.com/wjasper/Linux_Drivers/tree/master/USB/mcc-libusb
 
+## Running
 
+Get mbusd running for communications with the VFD:
+```
+sudo ./mbusd -d -L - -v 9 -p /dev/ttyUSB0 -s 9600 -m 8N2 -T 0
+```
+
+
+Hold your hat, get to a safe place, and run this:
+```
+sudo ./dynoHR3 data/no_turbine_full_run_backwards
+```

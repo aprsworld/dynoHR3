@@ -475,6 +475,29 @@ int daq_acquire(void) {
 	return ch[0].nSamples;
 }
 
+void dyno_step(int rpm) {
+	/* start new measurement */
+	fprintf(stderr,"##################################################################################\n");
+	init_channel_stats();
+
+	/* command dyno RPM */
+	fprintf(stderr,"# setting dyno RPM to %d\n",rpm);
+	vfd_gs3_set_rpm(rpm);
+
+	/* wait for dyno RPM to stabilize */
+	fprintf(stderr,"# delay to allow RPM to be reached\n");
+	sleep(DYNO_RPM_WAIT);
+
+	/* acquire data */
+	fprintf(stderr,"# acquiring data\n");
+	daq_acquire();
+
+	/* send / save data */
+	fprintf(stderr,"# flushing logged data\n");
+	fflush(fp_raw);
+	fflush(fp_stats);
+}
+
 int main (int argc, char **argv) {
 	int i;
 	int ret;
@@ -560,26 +583,14 @@ int main (int argc, char **argv) {
 
 	/* step down. Need to spin DUT fast to establish field magnetism. Then we work down. Don't be scared. */
 	for ( rpm=DYNO_RPM_END ; rpm>=DYNO_RPM_START ; rpm-=DYNO_RPM_STEP ) {
-		/* start new measurement */
-		fprintf(stderr,"##################################################################################\n");
-		init_channel_stats();
+		dyno_step(rpm);
+	}
 
-		/* command dyno RPM */
-		fprintf(stderr,"# setting dyno RPM to %d\n",rpm);
-		vfd_gs3_set_rpm(rpm);
+	/* do extended run at 150 RPM */
+	for ( i=0 ; i<1000 ; i++ ) {
+		fprintf(stderr,"########## Extended Run - step=%d #########################################################\n",i);
 
-		/* wait for dyno RPM to stabilize */
-		fprintf(stderr,"# delay to allow RPM to be reached\n");
-		sleep(DYNO_RPM_WAIT);
-
-		/* acquire data */
-		fprintf(stderr,"# acquiring data\n");
-		daq_acquire();
-
-		/* send / save data */
-		fprintf(stderr,"# flushing logged data\n");
-		fflush(fp_raw);
-		fflush(fp_stats);
+		dyno_step(150);
 	}
 
 

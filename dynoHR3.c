@@ -586,12 +586,14 @@ int main (int argc, char **argv) {
 		dyno_step(rpm);
 	}
 
+#if 0
 	/* do extended run at 150 RPM */
 	for ( i=0 ; i<1000 ; i++ ) {
 		fprintf(stderr,"########## Extended Run - step=%d #########################################################\n",i);
 
 		dyno_step(150);
 	}
+#endif
 
 
 stop:

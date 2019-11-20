@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <libgen.h>
 
 #include <modbus.h>
 #include "pmd.h"
@@ -505,6 +506,8 @@ int main (int argc, char **argv) {
 	char filename_stats[1024];
 	struct timeval tv;
 
+	fprintf(stderr,"# dynoHR3 being run as '%s'\n",basename(argv[0]));
+
 	if ( 2 != argc ) {
 		fprintf(stderr,"dynoHR3 outputFilenamePrefix\n");
 		exit(1);
@@ -586,14 +589,23 @@ int main (int argc, char **argv) {
 		dyno_step(rpm);
 	}
 
-#if 0
-	/* do extended run at 150 RPM */
-	for ( i=0 ; i<1000 ; i++ ) {
-		fprintf(stderr,"########## Extended Run - step=%d #########################################################\n",i);
+	/* if program invoked as dynoHR3e ('e' at the end) we will do an extended run */
+	if ( 0 == strcmp("dynoHR3e",basename(argv[0])) ) {
+		fprintf(stderr,"# program run as dynoHR3e so we will do extended run for 1000 steps\n");
 
-		dyno_step(150);
+		/* do initial RPM set and allow time for ramp */
+		fprintf(stderr,"# setting dyno RPM to %d\n",150);
+		vfd_gs3_set_rpm(rpm);
+		fprintf(stder,"# sleeping 15 seconds to allow ramp\n");
+		sleep(15);
+
+		/* do extended run at 150 RPM */
+		for ( i=0 ; i<1000 ; i++ ) {
+			fprintf(stderr,"########## Extended Run - step=%d #########################################################\n",i);
+
+			dyno_step(150);
+		}
 	}
-#endif
 
 
 stop:
